@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline Speech Recognition Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #5a67d8;
+            margin-bottom: 1.5rem;
+            font-size: 2rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 1.1rem;
+        }
+
+        .upload-section {
+            border: 2px dashed #cbd5e0;
+            border-radius: 10px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #5a67d8;
+        }
+
+        .upload-section.dragover {
+            border-color: #5a67d8;
+            background-color: #f7fafc;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background: #5a67d8;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-weight: 500;
+        }
+
+        .file-label:hover {
+            background: #4c51bf;
+        }
+
+        .language-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .language-section label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #4a5568;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #5a67d8;
+            box-shadow: 0 0 0 3px rgba(90, 103, 216, 0.1);
+        }
+
+        .transcribe-btn {
+            width: 100%;
+            padding: 1rem;
+            background: #48bb78;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-bottom: 1.5rem;
+        }
+
+        .transcribe-btn:hover:not(:disabled) {
+            background: #38a169;
+        }
+
+        .transcribe-btn:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+
+        .result-section {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f7fafc;
+            border-radius: 8px;
+            border-left: 4px solid #5a67d8;
+        }
+
+        .result-section h3 {
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+        }
+
+        .transcript {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #2d3748;
+            white-space: pre-wrap;
+        }
+
+        .metadata {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+            color: #718096;
+        }
+
+        .error {
+            background: #fed7d7;
+            border-left-color: #f56565;
+            color: #c53030;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #5a67d8;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #e2e8f0;
+            border-top: 3px solid #5a67d8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .file-info {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .api-status {
+            background: #e6fffa;
+            border: 1px solid #81e6d9;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #234e52;
+        }
+
+        .api-status.error {
+            background: #fed7d7;
+            border-color: #feb2b2;
+            color: #c53030;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Offline Speech Recognition</h1>
+        <p class="subtitle">Upload a WAV audio file to get an accurate transcription using Vosk AI</p>
+        
+        <div id="apiStatus" class="api-status">
+            <div class="spinner"></div>
+            Checking API status...
+        </div>
+
+        <form id="transcriptionForm">
+            <div class="upload-section" id="uploadSection">
+                <input type="file" id="audioFile" accept=".wav" required>
+                <label for="audioFile" class="file-label">
+                    📁 Choose Audio File (.wav)
+                </label>
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+
+            <div class="language-section">
+                <label for="language">Select Language:</label>
+                <select id="language" name="language">
+                    <option value="en">English</option>
+                    <option value="hin">Hindi</option>
+                </select>
+            </div>
+
+            <button type="submit" class="transcribe-btn" id="transcribeBtn" disabled>
+                🎯 Transcribe Audio
+            </button>
+        </form>
+
+        <div id="result" class="result-section" style="display: none;">
+            <h3>Transcription Result:</h3>
+            <div id="transcript" class="transcript"></div>
+            <div id="metadata" class="metadata"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000';
+        
+        // Elements
+        const apiStatus = document.getElementById('apiStatus');
+        const uploadSection = document.getElementById('uploadSection');
+        const audioFileInput = document.getElementById('audioFile');
+        const fileInfo = document.getElementById('fileInfo');
+        const languageSelect = document.getElementById('language');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const transcriptionForm = document.getElementById('transcriptionForm');
+        const resultSection = document.getElementById('result');
+        const transcript = document.getElementById('transcript');
+        const metadata = document.getElementById('metadata');
+
+        // Check API status on load
+        async function checkApiStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    apiStatus.innerHTML = '✅ API is online and ready';
+                    apiStatus.classList.remove('error');
+                    
+                    // Load available models
+                    const modelsResponse = await fetch(`${API_BASE_URL}/models`);
+                    const modelsData = await modelsResponse.json();
+                    
+                    if (modelsData.available_models && modelsData.available_models.length > 0) {
+                        updateLanguageOptions(modelsData.available_models);
+                    }
+                } else {
+                    throw new Error(data.error || 'API check failed');
+                }
+            } catch (error) {
+                apiStatus.innerHTML = `❌ API is offline: ${error.message}`;
+                apiStatus.classList.add('error');
+                transcribeBtn.disabled = true;
+            }
+        }
+
+        function updateLanguageOptions(availableModels) {
+            languageSelect.innerHTML = '';
+            availableModels.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model === 'en' ? 'English' : 
+                                   model === 'hin' ? 'Hindi' : 
+                                   model.toUpperCase();
+                languageSelect.appendChild(option);
+            });
+        }
+
+        // File handling
+        audioFileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const size = (file.size / 1024 / 1024).toFixed(2);
+                fileInfo.innerHTML = `📄 Selected: ${file.name} (${size} MB)`;
+                transcribeBtn.disabled = false;
+                
+                // Validate file type
+                if (!file.name.toLowerCase().endsWith('.wav')) {
+                    showError('Please select a WAV audio file.');
+                    transcribeBtn.disabled = true;
+                }
+            } else {
+                fileInfo.innerHTML = '';
+                transcribeBtn.disabled = true;
+            }
+        });
+
+        // Drag and drop
+        uploadSection.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                audioFileInput.files = files;
+                audioFileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        // Form submission
+        transcriptionForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const file = audioFileInput.files[0];
+            if (!file) {
+                showError('Please select an audio file.');
+                return;
+            }
+
+            // Show loading state
+            transcribeBtn.disabled = true;
+            transcribeBtn.innerHTML = '<div class="spinner"></div>Processing...';
+            resultSection.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('audio', file);
+                
+                const url = `${API_BASE_URL}/transcribe?lang=${languageSelect.value}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showResult(data);
+                } else {
+                    throw new Error(data.error || 'Transcription failed');
+                }
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                transcribeBtn.disabled = false;
+                transcribeBtn.innerHTML = '🎯 Transcribe Audio';
+            }
+        });
+
+        function showResult(data) {
+            resultSection.style.display = 'block';
+            resultSection.classList.remove('error');
+            
+            transcript.textContent = data.transcript || 'No speech detected in the audio.';
+            
+            let metadataHtml = `
+                <strong>Language:</strong> ${data.language || 'Unknown'}<br>
+                <strong>Segments processed:</strong> ${data.segments || 0}<br>
+                <strong>Frames processed:</strong> ${data.total_frames_processed || 0}
+            `;
+            
+            if (data.average_confidence) {
+                metadataHtml += `<br><strong>Average confidence:</strong> ${(data.average_confidence * 100).toFixed(1)}%`;
+            }
+            
+            metadata.innerHTML = metadataHtml;
+            
+            // Scroll to result
+            resultSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showError(message) {
+            resultSection.style.display = 'block';
+            resultSection.classList.add('error');
+            transcript.textContent = message;
+            metadata.innerHTML = '';
+        }
+
+        // Initialize
+        checkApiStatus();
+    </script>
+</body>
+</html>
