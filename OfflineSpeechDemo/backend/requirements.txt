@@ -1,2 +1,4 @@
 Flask==2.2.5
+Flask-CORS==4.0.0
 vosk==0.3.45
+python-dotenv==1.0.0
